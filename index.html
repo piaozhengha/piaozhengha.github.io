@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f7fa;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .auth-container, .recharge-container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+        }
+        .trading-container, .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            display: none;
+        }
+        #kline-chart {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .order-item, .user-item {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .pnl-positive { color: #28a745; font-weight: bold; }
+        .pnl-negative { color: #dc3545; font-weight: bold; }
+        .pnl-neutral { color: #6c757d; }
+        .recharge-card, .price-management-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .address-item {
+            word-break: break-all;
+            padding: 8px 0;
+            font-family: Consolas, monospace;
+        }
+        .recharge-amount-display {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .admin-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .pending-recharge-item, .pending-settle-item, .pending-order-item {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-detail-item {
+            margin: 8px 0;
+        }
+        .order-detail-item {
+            padding: 8px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin: 8px 0;
+        }
+        .loading-text {
+            color: #0d6efd;
+            font-style: italic;
+        }
+        .price-input-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .price-input-group label {
+            min-width: 100px;
+            font-weight: 600;
+        }
+        .price-input-group input {
+            flex: 1;
+            max-width: 200px;
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #0d6efd;
+        }
+        .admin-user-data-editor {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .admin-order-editor {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .admin-settle-editor {
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .disabled-btn {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .pnl-info {
+            padding: 8px;
+            border-radius: 4px;
+            margin: 8px 0;
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+        }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">请稍候...</div>
+
+<!-- 登录页 -->
+<div class="auth-container" id="authPage">
+    <h3 class="text-center mb-4">后台管理</h3>
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item"><button class="nav-link active" onclick="switchTab('login')">登录</button></li>
+        <li class="nav-item"><button class="nav-link" onclick="switchTab('register')">注册</button></li>
+    </ul>
+    <div id="loginForm">
+        <div class="mb-3">
+            <label class="form-label">用户名</label>
+            <input type="text" class="form-control" id="loginUsername" placeholder="用户名">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">密码</label>
+            <input type="password" class="form-control" id="loginPassword" placeholder="密码">
+        </div>
+        <button class="btn btn-primary w-100" onclick="userLogin()">登录</button>
+    </div>
+    <div id="registerForm" style="display:none;">
+        <div class="mb-3">
+            <label class="form-label">用户名</label>
+            <input type="text" class="form-control" id="regUsername">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">邮箱</label>
+            <input type="email" class="form-control" id="regEmail">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">密码</label>
+            <input type="password" class="form-control" id="regPassword">
+        </div>
+        <button class="btn btn-success w-100" onclick="userRegister()">注册</button>
+    </div>
+</div>
+
+<!-- 用户交易页 -->
+<div class="trading-container" id="tradingPage">
+    <div class="header">
+        <h4>交易面板</h4>
+        <div>
+            <span id="currentUserName"></span>
+            <button class="btn btn-sm btn-outline-danger ms-2" onclick="logout()">退出</button>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h5>余额: $<span id="userBalance" class="text-success">0.00</span></h5>
+            <h6>总盈亏: <span id="totalPnl" class="pnl-neutral">$0.00</span></h6>
+            <p id="balanceWarning" class="text-danger" style="display:none;">余额为0，请充值</p>
+        </div>
+        <div class="col-md-6">
+            <select class="form-select w-50 float-end" id="assetSelect" onchange="updateKline()">
+                <option value="gold">黄金(XAUUSD)</option>
+                <option value="silver">白银(XAGUSD)</option>
+                <option value="eurusd">欧美(EURUSD)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="recharge-card">
+        <h5>充值</h5>
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number" class="form-control" id="rechargeAmountInput" min="1" step="0.01" placeholder="金额">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-success w-100" onclick="openRechargePage()">去充值</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="kline-chart"></div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card p-3">
+                <h5>下单</h5>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="orderType" id="buyOrder" value="buy" checked>
+                        <label class="form-check-label">买涨</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="orderType" id="sellOrder" value="sell">
+                        <label class="form-check-label">买跌</label>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">当前价格</label>
+                    <input type="number" class="form-control" id="currentPrice" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">手数</label>
+                    <input type="number" class="form-control" id="orderVolume" value="1.0" min="0.1" step="0.1">
+                </div>
+                <button class="btn btn-primary w-100" id="submitOrderBtn" onclick="placeOrder()">下单</button>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="card p-3">
+                <h5>我的订单</h5>
+                <div id="myOrdersList"><p class="text-muted">暂无订单</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 充值页 -->
+<div class="recharge-container" id="rechargePage" style="display:none;">
+    <h4 class="text-center mb-4">充值</h4>
+    <div class="recharge-amount-display text-center">金额: $<span id="displayRechargeAmount">0.00</span></div>
+    <hr>
+    <div class="address-item">TGbNnmn59Cd1WCBqHkEtEdiz2yrWJT38Uj</div>
+    <div class="address-item">TLxTtGdKJvpstbGDvsZ4J2j1MpGdDuZK9B</div>
+    <div class="address-item">TLzWs8qmcNdRQw4issWhcY9z7U5mb4V3PN</div>
+    <div class="address-item">THNz9SdkUGsEHf76W4YaWUPjzeReopVJX8</div>
+    <div class="address-item">TVegSRTxejTbCkrLcAvUPbBq3j8zA8ZUse</div>
+    <div class="address-item">TNVErfbbs3Py12twD6cuA1FYnvvjhcX36a</div>
+    <div class="address-item">THdNfZxnrmsnPz4XxeHpYWZD565A1hRoHT</div>
+    <div class="address-item">TJfvf6Mdb6L6xwRANYkPoY4djH5pL29K8Y</div>
+    <div class="address-item">TMn1qanXLy3VeQ85aCJUUDYCxENiTABhqS</div>
+    <div class="address-item">TPYX843tcCWrMvUxBeQojxpVTtf5uQHjCU</div>
+    <div class="address-item">TACjXc9Nw1S5kufBvjZLu3yRSCMCm8w8Vo</div>
+    <div class="address-item">TWxTbEa6VLRakCb8JEksjavi9viuEZ5diH</div>
+    <div class="address-item">TJfbJnfs2mNcUTTiV8ismgmbSjDZTqUHbt</div>
+    <div class="address-item">TFGSXQHyHzKuxrZtPHVHnPb3aMVvt1EfB7</div>
+    <div class="address-item">TT1JbDK4ZiQMzbCDvy6HYKbXGwEdQxsgVC</div>
+    <div class="address-item">TU1qwd8h8hhpBRZYbYSVUFjymu1HFtjHNW</div>
+    <div class="address-item">TDd532aSMHD4yC6NZ19NfDiYPrbM6BcZ8D</div>
+    <div class="address-item">TDR8uZSQLCYjogTNrDkffwxYFtf6keynXX</div>
+    <div class="address-item">TEQ4A1P6K8fUr8SppNcFUrr1ytuMhCZYfz</div>
+    <hr>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary w-50" onclick="submitRechargeRequest()">提交充值</button>
+        <button class="btn btn-secondary w-50" onclick="backToTrading()">取消</button>
+    </div>
+</div>
+
+<!-- 管理员后台 -->
+<div class="admin-container" id="adminPage">
+    <div class="header">
+        <h4>管理员后台</h4>
+        <div>
+            <button class="btn btn-sm btn-outline-primary me-2" onclick="manualRefreshAdminData()">刷新数据</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="logout()">退出</button>
+        </div>
+    </div>
+
+    <div class="admin-card price-management-card">
+        <h5>价格管理</h5>
+        <div class="price-input-group">
+            <label for="goldPrice">黄金</label>
+            <input type="number" id="goldPrice" class="form-control" step="0.01">
+            <button class="btn btn-sm btn-primary" onclick="updateAssetPrice('gold')">修改</button>
+        </div>
+        <div class="price-input-group">
+            <label for="silverPrice">白银</label>
+            <input type="number" id="silverPrice" class="form-control" step="0.01">
+            <button class="btn btn-sm btn-primary" onclick="updateAssetPrice('silver')">修改</button>
+        </div>
+        <div class="price-input-group">
+            <label for="eurusdPrice">欧美</label>
+            <input type="number" id="eurusdPrice" class="form-control" step="0.0001">
+            <button class="btn btn-sm btn-primary" onclick="updateAssetPrice('eurusd')">修改</button>
+        </div>
+    </div>
+
+    <div class="admin-card">
+        <h5>待审核充值</h5>
+        <div id="pendingRechargeList"><p class="text-muted">暂无</p></div>
+    </div>
+
+    <div class="admin-card">
+        <h5>待结算订单（用户申请后显示盈亏）</h5>
+        <div id="pendingSettleOrdersList"><p class="text-muted">暂无待结算</p></div>
+    </div>
+
+    <div class="admin-card">
+        <h5>用户管理</h5>
+        <select class="form-select" id="adminUserSelect" onchange="loadUserDetails()"></select>
+        <div id="userDetailsPanel" style="display:none;" class="admin-user-data-editor mt-3">
+            <div class="user-detail-item mb-2">
+                <label>用户名</label><input type="text" id="editUsername" class="form-control" readonly>
+            </div>
+            <div class="user-detail-item mb-2">
+                <label>邮箱</label><input type="email" id="editEmail" class="form-control">
+            </div>
+            <div class="user-detail-item mb-2">
+                <label>余额</label><input type="number" id="editBalance" class="form-control" step="0.01">
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="saveUserDetails()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let users = [];
+let orders = [];
+let rechargeRequests = [];
+let assetPrices = { gold:2000.00, silver:25.00, eurusd:1.0800 };
+let currentUser = null;
+let orderIdCounter = 1;
+let klineChart = null;
+let currentRechargeAmount = 0;
+
+window.onload = function(){
+    loadAllData();
+    if(!users.some(u=>u.username==='admin')) createDefaultAdmin();
+};
+
+function loadAllData(){
+    users = JSON.parse(localStorage.getItem('tradingUsers'))||[];
+    orders = JSON.parse(localStorage.getItem('tradingOrders'))||[];
+    rechargeRequests = JSON.parse(localStorage.getItem('rechargeRequests'))||[];
+    assetPrices = JSON.parse(localStorage.getItem('assetPrices'))||{ gold:2000, silver:25, eurusd:1.08 };
+    orderIdCounter = orders.length>0 ? Math.max(...orders.map(o=>o.id))+1 : 1;
+}
+
+function createDefaultAdmin(){
+    users=[{id:999999,username:'admin',email:'admin@qq.com',password:'admin123',balance:999999,totalPnl:0,isAdmin:true}];
+    saveAllData();
+}
+
+function saveAllData(){
+    localStorage.setItem('tradingUsers',JSON.stringify(users));
+    localStorage.setItem('tradingOrders',JSON.stringify(orders));
+    localStorage.setItem('rechargeRequests',JSON.stringify(rechargeRequests));
+    localStorage.setItem('assetPrices',JSON.stringify(assetPrices));
+}
+
+function showLoading(){document.getElementById('loadingOverlay').style.display='flex';}
+function hideLoading(){document.getElementById('loadingOverlay').style.display='none';}
+
+function refreshAllData(){
+    loadAllData();
+    if(currentUser && !currentUser.isAdmin && document.getElementById('tradingPage').style.display==='block'){
+        let u=users.find(x=>x.id===currentUser.id);
+        if(u){currentUser=u; document.getElementById('userBalance').textContent=u.balance.toFixed(2);
+        document.getElementById('totalPnl').textContent='$'+u.totalPnl.toFixed(2);
+        document.getElementById('totalPnl').className=u.totalPnl>0?'pnl-positive':u.totalPnl<0?'pnl-negative':'pnl-neutral';}
+        updateCurrentPriceDisplay(); if(klineChart) updateKline(); loadMyOrders(); updateOrderButtonStatus();
+    }
+    if(currentUser && currentUser.isAdmin && document.getElementById('adminPage').style.display==='block'){
+        document.getElementById('goldPrice').value=assetPrices.gold.toFixed(2);
+        document.getElementById('silverPrice').value=assetPrices.silver.toFixed(2);
+        document.getElementById('eurusdPrice').value=assetPrices.eurusd.toFixed(4);
+        loadPendingRecharges(); loadPendingSettleOrders(); loadUserListForAdmin(); loadUserDetails();
+    }
+}
+
+function manualRefreshAdminData(){showLoading();setTimeout(()=>{refreshAllData();hideLoading();alert('刷新成功！');},500);}
+
+// —————————— 登录 ——————————
+function userLogin(){
+    let u=document.getElementById('loginUsername').value;
+    let p=document.getElementById('loginPassword').value;
+    let user=users.find(x=>x.username===u&&x.password===p);
+    if(!user){alert('账号或密码错误');return;}
+    currentUser=user; document.getElementById('authPage').style.display='none';
+    if(user.isAdmin){document.getElementById('adminPage').style.display='block';refreshAllData();}
+    else{document.getElementById('tradingPage').style.display='block';document.getElementById('currentUserName').textContent='欢迎 '+user.username;
+    document.getElementById('userBalance').textContent=user.balance.toFixed(2);
+    document.getElementById('totalPnl').textContent='$'+(user.totalPnl||0).toFixed(2);
+    initKlineChart(); updateCurrentPriceDisplay(); updateKline(); loadMyOrders(); updateOrderButtonStatus();}
+}
+
+function userRegister(){
+    let u=document.getElementById('regUsername').value.trim();
+    let e=document.getElementById('regEmail').value.trim();
+    let p=document.getElementById('regPassword').value;
+    if(!u||!e||!p){alert('请填写完整');return;}
+    if(users.some(x=>x.username===u)){alert('用户名已存在');return;}
+    users.push({id:Date.now(),username:u,email:e,password:p,balance:0,totalPnl:0,isAdmin:false});
+    saveAllData(); alert('注册成功！请登录'); switchTab('login');
+}
+
+function logout(){currentUser=null;document.getElementById('authPage').style.display='block';
+document.getElementById('tradingPage').style.display='none';document.getElementById('adminPage').style.display='none';
+document.getElementById('rechargePage').style.display='none';switchTab('login');}
+
+function switchTab(t){document.getElementById('loginForm').style.display=t==='login'?'block':'none';
+document.getElementById('registerForm').style.display=t==='register'?'block':'none';}
+
+// —————————— 充值 ——————————
+function openRechargePage(){
+    let a=parseFloat(document.getElementById('rechargeAmountInput').value);
+    if(isNaN(a)||a<1){alert('最低1元');return;}
+    currentRechargeAmount=a; document.getElementById('displayRechargeAmount').textContent=a.toFixed(2);
+    document.getElementById('tradingPage').style.display='none'; document.getElementById('rechargePage').style.display='block';
+}
+function submitRechargeRequest(){
+    rechargeRequests.push({id:Date.now(),userId:currentUser.id,username:currentUser.username,amount:currentRechargeAmount,status:'pending',createTime:new Date().toLocaleString()});
+    saveAllData(); alert('已提交，等待审核'); backToTrading(); refreshAllData();
+}
+function backToTrading(){currentRechargeAmount=0;document.getElementById('rechargeAmountInput').value='';
+document.getElementById('rechargePage').style.display='none';document.getElementById('tradingPage').style.display='block';}
+
+// —————————— 订单 ——————————
+function updateOrderButtonStatus(){
+    let b=parseFloat(document.getElementById('userBalance').textContent);
+    let btn=document.getElementById('submitOrderBtn');
+    let warn=document.getElementById('balanceWarning');
+    if(b<=0){btn.disabled=true;btn.classList.add('disabled-btn');warn.style.display='block';}
+    else{btn.disabled=false;btn.classList.remove('disabled-btn');warn.style.display='none';}
+}
+
+function placeOrder(){
+    let b=parseFloat(document.getElementById('userBalance').textContent);
+    if(b<=0){alert('余额不足，请充值');return;}
+    showLoading(); setTimeout(()=>{
+        let a=document.getElementById('assetSelect').value;
+        let d=document.querySelector('input[name="orderType"]:checked').value;
+        let p=parseFloat(document.getElementById('currentPrice').value);
+        let v=parseFloat(document.getElementById('orderVolume').value);
+        if(isNaN(v)||v<=0){hideLoading();alert('手数错误');return;}
+        orders.push({id:orderIdCounter++,userId:currentUser.id,username:currentUser.username,asset:a,direction:d,entryPrice:p,volume:v,status:'open',profitLoss:0,createTime:new Date().toLocaleString(),settlementRequested:false,settlementRequestTime:null});
+        saveAllData(); hideLoading(); alert('下单成功'); loadMyOrders();
+    },800);
+}
+
+function requestSettleOrder(oid){
+    showLoading(); setTimeout(()=>{
+        let i=orders.findIndex(x=>x.id===oid&&x.userId===currentUser.id&&x.status==='open');
+        if(i===-1){hideLoading();alert('订单不存在或已结算');return;}
+        orders[i].settlementRequested=true; orders[i].settlementRequestTime=new Date().toLocaleString();
+        saveAllData(); hideLoading(); alert('已提交结算申请'); loadMyOrders(); refreshAllData();
+    },800);
+}
+
+function loadMyOrders(){
+    let c=document.getElementById('myOrdersList');
+    let os=orders.filter(x=>x.userId===currentUser.id);
+    if(os.length===0){c.innerHTML='<p class="text-muted">暂无订单</p>';return;}
+    let h='';
+    os.forEach(o=>{
+        let cp=assetPrices[o.asset];
+        let pl=o.status==='open' ? (o.direction==='buy'?(cp-o.entryPrice)*o.volume*100:(o.entryPrice-cp)*o.volume*100) : o.profitLoss;
+        let st=o.settlementRequested ? '<span class="badge bg-primary">已申请结算</span>':'';
+        h+=`
+        <div class="order-item p-2 border-bottom">
+            <div class="row">
+                <div class="col-md-6">
+                    <p>订单号: ${o.id}</p>
+                    <p>品种: ${o.asset.toUpperCase()}</p>
+                    <p>方向: ${o.direction==='buy'?'买涨':'买跌'}</p>
+                    <p>开仓价: ${o.entryPrice.toFixed(o.asset==='eurusd'?4:2)}</p>
+                    ${st}
+                </div>
+                <div class="col-md-6">
+                    <p>手数: ${o.volume}</p>
+                    <p>盈亏: <span class="${pl>0?'pnl-positive':pl<0?'pnl-negative':'pnl-neutral'}">$${pl.toFixed(2)}</span></p>
+                    <p>状态: ${o.status==='open'?'持仓':'已结算'}</p>
+                    ${o.status==='open'?`<button class="btn btn-sm btn-warning" onclick="requestSettleOrder(${o.id})">${o.settlementRequested?'已申请':'申请结算'}</button>`:''}
+                </div>
+            </div>
+        </div>`;
+    });
+    c.innerHTML=h;
+}
+
+// —————————— K线 专业版 ——————————
+function initKlineChart(){klineChart=echarts.init(document.getElementById('kline-chart'));}
+
+function updateCurrentPriceDisplay(){
+    let a=document.getElementById('assetSelect').value;
+    document.getElementById('currentPrice').value=assetPrices[a].toFixed(a==='eurusd'?4:2);
+}
+
+function generateKlineData(asset){
+    const base=assetPrices[asset];
+    const data=[];
+    const now=Date.now();
+    const count=60;
+    let vol=asset==='gold'?3.5:asset==='silver'?0.18:0.0008;
+    let trend=(Math.random()-0.5)*0.1;
+    let price=base;
+    for(let i=0;i<count;i++){
+        const t=now-(count-i)*240000;
+        price+=trend+(Math.random()-0.5)*vol;
+        const open=price;
+        const close=open+(Math.random()-0.5)*vol*0.7;
+        const high=Math.max(open,close)+Math.random()*vol*0.4;
+        const low=Math.min(open,close)-Math.random()*vol*0.4;
+        const fix=asset==='eurusd'?4:2;
+        data.push([t,parseFloat(open.toFixed(fix)),parseFloat(high.toFixed(fix)),parseFloat(low.toFixed(fix)),parseFloat(close.toFixed(fix)),Math.floor(Math.random()*200+100)]);
+    }
+    return data;
+}
+
+function updateKline(){
+    if(!klineChart) return;
+    const a=document.getElementById('assetSelect').value;
+    const d=generateKlineData(a);
+    const last=d[d.length-1][4];
+    document.getElementById('currentPrice').value=last.toFixed(a==='eurusd'?4:2);
+    const opt={
+        backgroundColor:'#171B26',textStyle:{color:'#EAEAEA'},
+        tooltip:{trigger:'axis',axisPointer:{type:'cross'},backgroundColor:'rgba(20,25,35,0.9)'},
+        grid:[{left:'5%',right:'5%',top:'10%',height:'60%'},{left:'5%',right:'5%',top:'75%',height:'15%'}],
+        xAxis:[{type:'time',gridIndex:0,axisLine:{lineStyle:{color:'#444'}},axisLabel:{color:'#999'},splitLine:{show:false}},
+               {type:'time',gridIndex:1,axisLine:{show:false},axisLabel:{show:false},splitLine:{show:false}}],
+        yAxis:[{scale:true,gridIndex:0,splitLine:{lineStyle:{color:'#333'}},axisLine:{lineStyle:{color:'#444'}},axisLabel:{color:'#999'}},
+               {scale:false,gridIndex:1,splitLine:{show:false},axisLine:{show:false},axisLabel:{show:false}}],
+        series:[{name:'K',type:'candlestick',data:d.map(x=>[x[0],x[1],x[2],x[3],x[4]]),
+                itemStyle:{color:'#26A69A',color0:'#EF5350',borderColor:'#26A69A',borderColor0:'#EF5350'}},
+               {name:'Vol',type:'bar',xAxisIndex:1,yAxisIndex:1,data:d.map(x=>[x[0],x[5]]),itemStyle:{color:'#42A5F5'}}]
+    };
+    klineChart.setOption(opt);
+}
+
+// —————————— 管理员 ——————————
+function updateAssetPrice(t){
+    let v=parseFloat(document.getElementById(t+'Price').value);
+    if(isNaN(v)||v<=0){alert('价格错误');return;}
+    assetPrices[t]=v; saveAllData(); alert('修改成功'); manualRefreshAdminData();
+}
+
+function loadPendingRecharges(){
+    let c=document.getElementById('pendingRechargeList');
+    let ps=rechargeRequests.filter(x=>x.status==='pending');
+    if(ps.length===0){c.innerHTML='<p class="text-muted">暂无</p>';return;}
+    let h=''; ps.forEach(r=>{h+=`<div class="pending-recharge-item"><div>${r.username} $${r.amount.toFixed(2)} ${r.createTime}</div><div><button class="btn btn-sm btn-success" onclick="approveRecharge(${r.id})">通过</button><button class="btn btn-sm btn-danger ms-1" onclick="rejectRecharge(${r.id})">拒绝</button></div></div>`;});
+    c.innerHTML=h;
+}
+function approveRecharge(id){
+    let i=rechargeRequests.findIndex(x=>x.id===id);
+    if(i===-1)return;
+    let r=rechargeRequests[i];
+    let ui=users.findIndex(x=>x.id===r.userId);
+    users[ui].balance+=r.amount;
+    rechargeRequests[i].status='approved';
+    saveAllData(); alert('充值成功'); manualRefreshAdminData();
+}
+function rejectRecharge(id){
+    let i=rechargeRequests.findIndex(x=>x.id===id);
+    if(i===-1)return;
+    rechargeRequests[i].status='rejected';
+    saveAllData(); alert('已拒绝'); manualRefreshAdminData();
+}
+
+// —————————— 结算（显示盈亏）——————————
+function loadPendingSettleOrders(){
+    let c=document.getElementById('pendingSettleOrdersList');
+    let os=orders.filter(x=>x.status==='open'&&x.settlementRequested);
+    if(os.length===0){c.innerHTML='<p class="text-muted">暂无用户申请结算</p>';return;}
+    let h='';
+    os.forEach(o=>{
+        let cp=assetPrices[o.asset];
+        let pl=o.direction==='buy'?(cp-o.entryPrice)*o.volume*100:(o.entryPrice-cp)*o.volume*100;
+        let cl=pl>0?'pnl-positive':pl<0?'pnl-negative':'pnl-neutral';
+        let sel=pl>0?'win':'lose';
+        h+=`
+        <div class="admin-settle-editor mt-2">
+            <div class="d-flex justify-content-between"><h6>订单 ${o.id} 用户 ${o.username}</h6><span class="badge bg-info">${o.settlementRequestTime}</span></div>
+            <div class="pnl-info">
+                <div class="row">
+                    <div class="col-md-4">品种:${o.asset.toUpperCase()}</div>
+                    <div class="col-md-4">方向:${o.direction==='buy'?'买涨':'买跌'}</div>
+                    <div class="col-md-4">盈亏: <span class="${cl}">$${pl.toFixed(2)}</span></div>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-4">
+                    <select id="settleStatus_${o.id}" class="form-select">
+                        <option value="win" ${sel==='win'?'selected':''}>盈利</option>
+                        <option value="lose" ${sel==='lose'?'selected':''}>亏损</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <input type="number" id="settlePnl_${o.id}" class="form-control" value="${pl.toFixed(2)}" step="0.01">
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" onclick="settleOrderByAdmin(${o.id})">确认结算</button>
+                </div>
+            </div>
+        </div>`;
+    });
+    c.innerHTML=h;
+}
+
+function settleOrderByAdmin(oid){
+    let i=orders.findIndex(x=>x.id===oid);
+    if(i===-1)return;
+    let s=document.getElementById('settleStatus_'+oid).value;
+    let p=parseFloat(document.getElementById('settlePnl_'+oid).value);
+    if(isNaN(p)){alert('请输入盈亏');return;}
+    orders[i].status=s; orders[i].profitLoss=p; orders[i].settleTime=new Date().toLocaleString();
+    orders[i].settlementRequested=false; orders[i].settlementRequestTime=null;
+    let ui=users.findIndex(x=>x.id===orders[i].userId);
+    users[ui].balance+=p; users[ui].totalPnl+=p;
+    saveAllData(); alert('结算完成'); manualRefreshAdminData();
+}
+
+// —————————— 用户管理 ——————————
+function loadUserListForAdmin(){
+    let s=document.getElementById('adminUserSelect');
+    s.innerHTML='<option value="">选择用户</option>';
+    users.filter(x=>!x.isAdmin).forEach(u=>{
+        let opt=document.createElement('option');
+        opt.value=u.id; opt.textContent=`${u.username} 余额:$${u.balance.toFixed(2)}`;
+        s.appendChild(opt);
+    });
+}
+function loadUserDetails(){
+    let uid=parseInt(document.getElementById('adminUserSelect').value);
+    let p=document.getElementById('userDetailsPanel');
+    if(isNaN(uid)){p.style.display='none';return;}
+    let u=users.find(x=>x.id===uid);
+    if(!u)return;
+    document.getElementById('editUsername').value=u.username;
+    document.getElementById('editEmail').value=u.email||'';
+    document.getElementById('editBalance').value=u.balance.toFixed(2);
+    p.style.display='block';
+}
+function saveUserDetails(){
+    let uid=parseInt(document.getElementById('adminUserSelect').value);
+    let i=users.findIndex(x=>x.id===uid);
+    if(i===-1)return;
+    users[i].email=document.getElementById('editEmail').value;
+    users[i].balance=parseFloat(document.getElementById('editBalance').value);
+    saveAllData(); alert('保存成功'); manualRefreshAdminData();
+}
+</script>
+</body>
+</html>
